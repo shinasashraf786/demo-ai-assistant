@@ -15,7 +15,7 @@ import streamlit as st
 load_dotenv()
 
 # Configure OpenAI client
-client = OpenAI(api_key=os.getenv("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"))
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # Your Assistant ID
 ASSISTANT_ID = "asst_bBLvW1TIJ2lBYTjCYlfftrhu"
