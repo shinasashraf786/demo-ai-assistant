@@ -1,5 +1,5 @@
 # Copyright 2025
-# HR Shortlister Streamlit Application
+# HR Shortlister Streamlit Chat Application
 
 import os
 import time
@@ -14,13 +14,13 @@ import streamlit as st
 # Load environment variables from .env
 load_dotenv()
 
-# Set up OpenAI client
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+# Configure OpenAI client
+client = OpenAI(api_key=os.getenv("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"))
 
-# Use your assistant ID
+# Your Assistant ID
 ASSISTANT_ID = "asst_bBLvW1TIJ2lBYTjCYlfftrhu"
 
-# Streamlit configuration
+# Streamlit Page Config
 st.set_page_config(page_title="HR Shortlister", page_icon="🤖")
 
 # -------------------------------------------------
@@ -28,90 +28,100 @@ st.set_page_config(page_title="HR Shortlister", page_icon="🤖")
 # -------------------------------------------------
 
 st.title("HR Shortlister 🤖")
-st.caption("Use this assistant to evaluate and shortlist job candidates efficiently.")
+st.caption("Chat with your AI assistant to evaluate and shortlist candidates efficiently.")
 
 st.markdown("""
-This tool connects to your **OpenAI Assistant** to help review candidate resumes,
-generate shortlist recommendations, and assist with HR decision support.
+This assistant connects to **OpenAI’s HR Shortlister** to help you:
+- Review and compare candidate profiles.
+- Generate shortlist recommendations.
+- Draft evaluation feedback and hiring insights.
 """)
 
 # -------------------------------------------------
-# Input Area
+# Chat Interface Setup
 # -------------------------------------------------
 
-st.subheader("Enter Candidate Query")
-user_input = st.text_area(
-    "Example: Evaluate John's resume for a marketing role, or shortlist candidates for a data analyst position."
-)
+if "thread_id" not in st.session_state:
+    thread = client.beta.threads.create()
+    st.session_state.thread_id = thread.id
+
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+# Display prior messages
+for msg in st.session_state.messages:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
 
 # -------------------------------------------------
-# Process Query
+# User Input
 # -------------------------------------------------
 
-if st.button("Ask HR Shortlister"):
-    if not user_input.strip():
-        st.warning("Please enter a query first.")
-    else:
-        with st.spinner("Analyzing candidate data..."):
+if prompt := st.chat_input("Ask HR Shortlister anything..."):
+    # Display user message
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    with st.chat_message("user"):
+        st.markdown(prompt)
+
+    # Add user message to thread
+    client.beta.threads.messages.create(
+        thread_id=st.session_state.thread_id,
+        role="user",
+        content=prompt
+    )
+
+    # Run the assistant
+    with st.chat_message("assistant"):
+        with st.spinner("HR Shortlister is thinking..."):
             try:
-                # Create a new thread for conversation
-                thread = client.beta.threads.create()
-
-                # Add user message
-                client.beta.threads.messages.create(
-                    thread_id=thread.id,
-                    role="user",
-                    content=user_input
-                )
-
-                # Run the assistant
                 run = client.beta.threads.runs.create(
-                    thread_id=thread.id,
+                    thread_id=st.session_state.thread_id,
                     assistant_id=ASSISTANT_ID
                 )
 
-                # Wait until the assistant completes
+                # Poll until run completes
                 while True:
                     status = client.beta.threads.runs.retrieve(
-                        thread_id=thread.id,
+                        thread_id=st.session_state.thread_id,
                         run_id=run.id
                     )
                     if status.status == "completed":
                         break
                     time.sleep(1)
 
-                # Fetch response
-                messages = client.beta.threads.messages.list(thread_id=thread.id)
+                # Get assistant reply
+                messages = client.beta.threads.messages.list(
+                    thread_id=st.session_state.thread_id
+                )
                 reply = messages.data[0].content[0].text.value
 
-                # Display assistant reply
-                st.subheader("HR Shortlister’s Response:")
-                st.write(reply)
+                st.markdown(reply)
+
+                # Store assistant response
+                st.session_state.messages.append({"role": "assistant", "content": reply})
 
             except Exception as e:
                 st.error(f"An error occurred: {e}")
 
 # -------------------------------------------------
-# Sidebar Information
+# Sidebar
 # -------------------------------------------------
 
 st.sidebar.header("About HR Shortlister")
 st.sidebar.write("""
-**HR Shortlister** uses OpenAI's API to provide intelligent support for candidate evaluations.
-
-You can:
-- Analyse resumes or candidate summaries.
-- Generate shortlist recommendations.
-- Draft hiring feedback or evaluation criteria.
+**HR Shortlister** uses OpenAI’s API to support HR teams by:
+- Analysing resumes and candidate experience.
+- Providing shortlist recommendations.
+- Suggesting structured evaluation feedback.
 """)
 
 st.sidebar.divider()
 
-st.sidebar.header("Tips for Best Results")
+st.sidebar.header("Tips for Better Results")
 st.sidebar.write("""
-- Use clear role descriptions.
-- Provide relevant candidate details.
-- Ask specific, measurable questions.
+- Be clear about the role and context.
+- Provide short candidate summaries if possible.
+- Ask measurable, outcome-based questions.
 """)
 
 st.sidebar.divider()
